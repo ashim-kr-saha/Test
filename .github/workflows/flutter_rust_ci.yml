@@ -45,7 +45,7 @@ jobs:
     - name: Get Dependencies
       run: |
         flutter pub get
-        cargo check
+        cargo check --manifest-path=./rust/Cargo.toml
       shell: bash
     
     # Run Dart/Flutter tests
