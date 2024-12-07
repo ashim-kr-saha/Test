@@ -1,0 +1,128 @@
+name: Flutter and Rust CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Setup Rust
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    # Setup Flutter
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.x'
+        channel: 'stable'
+    
+    # Cache dependencies
+    - name: Cache Flutter dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ runner.tool_cache }}/flutter
+          ~/.pub-cache
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-flutter-rust-${{ hashFiles('**/pubspec.lock', '**/Cargo.lock') }}
+    
+    # Get dependencies
+    - name: Get Dependencies
+      run: |
+        flutter pub get
+        cargo check
+      shell: bash
+    
+    # Run Dart/Flutter tests
+    - name: Run Flutter Tests
+      run: flutter test
+      continue-on-error: true
+    
+    # Run Rust tests
+    - name: Run Rust Tests
+      run: cargo test
+      continue-on-error: true
+    
+    # Build for different platforms
+    - name: Build Applications
+      run: |
+        # Android build (Linux runner)
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          flutter build apk
+          flutter build appbundle
+        fi
+        
+        # iOS build (macOS runner)
+        if [ "${{ matrix.os }}" == "macos-latest" ]; then
+          flutter build ios --release --no-codesign
+        fi
+        
+        # Windows build (Windows runner)
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          flutter build windows
+        fi
+        
+        # macOS desktop build (macOS runner)
+        if [ "${{ matrix.os }}" == "macos-latest" ]; then
+          flutter build macos
+        fi
+        
+        # Web build (any runner, but we'll do it on Ubuntu)
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          flutter build web
+        fi
+      shell: bash
+    
+    # Upload build artifacts
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-builds-${{ matrix.os }}
+        path: |
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/bundle/release/*.aab
+          build/windows/x64/runner/Release
+          build/ios/iphoneos/*.app
+          build/macos/Build/Products/Release/*.app
+          build/web
+  
+  # Optional release job
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    steps:
+    - name: Download Artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          app-builds-*/**/*
+        draft: false
+        prerelease: false
+
+# # Manual workflow dispatch
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       reason:
+#         description: 'Reason for manual run'
+#         required: false
+#         default: 'Manual trigger'
