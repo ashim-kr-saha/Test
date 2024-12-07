@@ -55,7 +55,7 @@ jobs:
     
     # Run Rust tests
     - name: Run Rust Tests
-      run: cargo test
+      run: cargo test --manifest-path=./rust/Cargo.toml
       continue-on-error: true
     
     # Build for different platforms
