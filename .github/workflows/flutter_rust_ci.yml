@@ -111,23 +111,6 @@ jobs:
           build/ios/iphoneos/*.app
           build/macos/Build/Products/Release/*.app
           build/web
-  
-  # Optional release job
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/v')
-    steps:
-    - name: Download Artifacts
-      uses: actions/download-artifact@v3
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          app-builds-*/**/*
-        draft: false
-        prerelease: false
 
 # # Manual workflow dispatch
 # on:
