@@ -15,6 +15,13 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+
+    # Setup Java 17 (required for Android Gradle plugin)
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
     
     # Setup Rust
     - name: Install Rust
