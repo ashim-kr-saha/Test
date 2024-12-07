@@ -3,6 +3,10 @@ name: Flutter and Rust CI/CD
 on:
   push:
     branches: [ main, develop ]
+    tags:
+      - 'v*'
+
+
   pull_request:
     branches: [ main, develop ]
 
@@ -112,7 +116,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/v')
     steps:
     - name: Download Artifacts
       uses: actions/download-artifact@v3
