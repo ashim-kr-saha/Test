@@ -33,7 +33,7 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.19.x'
+        flutter-version: '3.24.x'
         channel: 'stable'
     
     # Cache dependencies
@@ -51,7 +51,7 @@ jobs:
     - name: Get Dependencies
       run: |
         flutter pub get
-        cargo check
+        cargo check --manifest-path=./rust/Cargo.toml
       shell: bash
     
     # Build for different platforms
