@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Setup Java 17 (required for Android Gradle plugin)
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+    
+    # Setup Rust
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    # Setup Flutter
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.x'
+        channel: 'stable'
+    
+    # Cache dependencies
+    - name: Cache Dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ${{ runner.tool_cache }}/flutter
+          ~/.pub-cache
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-release-${{ hashFiles('**/pubspec.lock', '**/Cargo.lock') }}
+    
+    # Prepare dependencies
+    - name: Get Dependencies
+      run: |
+        flutter pub get
+        cargo check
+      shell: bash
+    
+    # Build for different platforms
+    - name: Build Release Applications
+      run: |
+        # Android build (Linux runner)
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          flutter build apk --release
+          flutter build appbundle --release
+        fi
+        
+        # iOS build (macOS runner)
+        if [ "${{ matrix.os }}" == "macos-latest" ]; then
+          flutter build ios --release --no-codesign
+        fi
+        
+        # Windows build (Windows runner)
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          flutter build windows --release
+        fi
+        
+        # macOS desktop build (macOS runner)
+        if [ "${{ matrix.os }}" == "macos-latest" ]; then
+          flutter build macos --release
+        fi
+        
+        # Web build (any runner, but we'll do it on Ubuntu)
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          flutter build web --release
+        fi
+      shell: bash
+    
+    # Upload build artifacts
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-artifacts-${{ matrix.os }}
+        path: |
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/bundle/release/*.aab
+          build/windows/x64/runner/Release
+          build/ios/iphoneos/*.app
+          build/macos/Build/Products/Release/*.app
+          build/web
+  
+  # Create GitHub Release
+  github-release:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download Artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: |
+          release-artifacts-*/**/*
+        draft: false
+        prerelease: false
+        body: |
+          ## Release Notes
+          
+          ### Changes in this version
+          - Add details about changes and new features
+          
+          ### Supported Platforms
+          - Android
+          - iOS
+          - Windows
+          - macOS
+          - Web
