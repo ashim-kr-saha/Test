@@ -109,7 +109,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: |
-          build/windows/x64/runner/Release
+          build/windows/x64/runner/Release/*.exe
 
     # Build for different platforms
     # - name: Build Release Applications
