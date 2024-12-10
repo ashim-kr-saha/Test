@@ -1,0 +1,91 @@
+name: Flutter Android Release
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events to the main branch
+  push:
+    branches: [ main ]
+    
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      release-type:
+        description: 'Release type (beta/production)'
+        required: true
+        default: 'beta'
+
+# Environment variables that can be used across jobs
+env:
+  JAVA_VERSION: "11.0"
+  FLUTTER_VERSION: "3.16.0"
+
+jobs:
+  build-and-release-android:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout the repository code
+    - uses: actions/checkout@v3
+
+    # Setup Java environment
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: ${{ env.JAVA_VERSION }}
+
+    # Setup Flutter environment
+    - name: Flutter action
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        channel: 'stable'
+
+    # Configure signing key for app
+    - name: Create Android keystore
+      env:
+        ENCODED_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      run: |
+        # Decode keystore from base64 secret
+        echo "$ENCODED_KEYSTORE" | base64 --decode > android/app/upload-keystore.jks
+        
+        # Create key properties file
+        echo "storeFile=upload-keystore.jks" > android/key.properties
+        echo "storePassword=$KEYSTORE_PASSWORD" >> android/key.properties
+        echo "keyAlias=upload" >> android/key.properties
+        echo "keyPassword=$KEYSTORE_PASSWORD" >> android/key.properties
+
+    # Clean and get dependencies
+    - name: Clean Flutter project
+      run: |
+        flutter clean
+        flutter pub get
+
+    # Build Android APK
+    - name: Build Android APK
+      run: flutter build apk --release
+
+    # Optional: Build App Bundle 
+    - name: Build Android App Bundle
+      run: flutter build appbundle --release
+
+    # Create GitHub Release
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: github.event_name == 'workflow_dispatch'
+      with:
+        files: |
+          build/app/outputs/flutter-apk/app-release.apk
+          build/app/outputs/bundle/release/app-release.aab
+        prerelease: ${{ github.event.inputs.release-type == 'beta' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+# Additional notes about workflow:
+# 1. Requires GitHub Secrets:
+#    - KEYSTORE_BASE64: Base64 encoded Android keystore
+#    - KEYSTORE_PASSWORD: Keystore password
+# 2. Customize Flutter/Java versions in env section as needed
+# 3. Adjust branch triggers and release conditions as per project requirements
